@@ -96,8 +96,20 @@ class BatchWizardUI:
         )
         self.stats_table.add_row("Failed", f"[red]{self.failed_jobs}[/red]")
 
-    def add_log(self, message: str):
-        self.log_messages.append(message)
+    def add_log(self, message: str, error_result: Optional[BatchJobResult] = None):
+        if error_result and not error_result.success and error_result.error_type:
+            # Format detailed error message with error information
+            detailed_message = f"{message}"
+            if error_result.error_type:
+                detailed_message += f" [Error: {error_result.error_type}]"
+            if error_result.error_message:
+                detailed_message += f" - {error_result.error_message}"
+            if error_result.error_details and error_result.error_details.get("suggestion"):
+                detailed_message += f" | Suggestion: {error_result.error_details['suggestion']}"
+            self.log_messages.append(detailed_message)
+        else:
+            self.log_messages.append(message)
+        
         if len(self.log_messages) > 10:  # Keep only the last 10 log messages
             self.log_messages.pop(0)
         logger.info(message)
@@ -257,4 +269,5 @@ class BatchWizardUI:
             self.console.print(
                 f"[red]Failed to download results for job {job_id}[/red]"
             )
+
 
