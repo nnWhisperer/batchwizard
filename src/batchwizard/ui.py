@@ -206,7 +206,7 @@ class BatchWizardUI:
                         else:
                             self.failed_jobs += 1
                             self.update_job_status(batch_job.id, "failed", "100%")
-                            self.add_log(f"Job failed: {batch_job.id}")
+                            self.add_log(f"Job failed: {batch_job.id}", error_result=result)
 
                         overall_progress.update(process_task, advance=1)
                         self.update_stats()
@@ -269,5 +269,6 @@ class BatchWizardUI:
             self.console.print(
                 f"[red]Failed to download results for job {job_id}[/red]"
             )
+
 
 
