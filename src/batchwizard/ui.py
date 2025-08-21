@@ -63,6 +63,7 @@ class BatchWizardUI:
         job_table.add_column("Job ID", style="dim", no_wrap=True)
         job_table.add_column("Status", style="bold")
         job_table.add_column("Progress", justify="right")
+        job_table.add_column("Error Details", style="red", no_wrap=False)
         return job_table
 
     def update_job_status(self, job_id: str, status: str, progress: str):
@@ -269,6 +270,7 @@ class BatchWizardUI:
             self.console.print(
                 f"[red]Failed to download results for job {job_id}[/red]"
             )
+
 
 
 
