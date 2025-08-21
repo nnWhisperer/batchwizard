@@ -188,16 +188,104 @@ class BatchProcessor:
                         logger.error(
                             f"No output file ID found for completed batch job {batch_job.id}"
                         )
+                        return BatchJobResult(
+                            job_id=batch_job.id,
+                            success=False,
+                            error_type="missing_output",
+                            error_message="Batch job completed but no output file was generated",
+                            error_details={"suggestion": "Check if the input file contained valid requests"}
+                        )
+                except AuthenticationError as e:
+                    logger.error(f"Authentication error processing batch job {batch_job.id}: Invalid or expired API key")
+                    return BatchJobResult(
+                        job_id=batch_job.id,
+                        success=False,
+                        error_type="authentication",
+                        error_message="Invalid or expired API key",
+                        error_details={"suggestion": "Please check and update your OpenAI API key"}
+                    )
+                except PermissionDeniedError as e:
+                    logger.error(f"Permission denied processing batch job {batch_job.id}: Insufficient permissions")
+                    return BatchJobResult(
+                        job_id=batch_job.id,
+                        success=False,
+                        error_type="permission_denied",
+                        error_message="Insufficient permissions or credits",
+                        error_details={"suggestion": "Check your account permissions and available credits"}
+                    )
+                except RateLimitError as e:
+                    logger.error(f"Rate limit exceeded processing batch job {batch_job.id}: Too many requests")
+                    return BatchJobResult(
+                        job_id=batch_job.id,
+                        success=False,
+                        error_type="rate_limit",
+                        error_message="Rate limit exceeded",
+                        error_details={"suggestion": "Wait before retrying or reduce request frequency"}
+                    )
+                except NotFoundError as e:
+                    logger.error(f"Batch job not found: {batch_job.id}")
+                    return BatchJobResult(
+                        job_id=batch_job.id,
+                        success=False,
+                        error_type="not_found",
+                        error_message="Batch job not found",
+                        error_details={"suggestion": "Verify the job ID is correct"}
+                    )
+                except InternalServerError as e:
+                    logger.error(f"OpenAI server error processing batch job {batch_job.id}: Please retry later")
+                    return BatchJobResult(
+                        job_id=batch_job.id,
+                        success=False,
+                        error_type="server_error",
+                        error_message="OpenAI server error",
+                        error_details={"suggestion": "Please retry later"}
+                    )
+                except APIError as e:
+                    logger.error(f"OpenAI API error processing batch job {batch_job.id}: {str(e)}")
+                    return BatchJobResult(
+                        job_id=batch_job.id,
+                        success=False,
+                        error_type="api_error",
+                        error_message=str(e),
+                        error_details={"suggestion": "Check the error message for specific details"}
+                    )
                 except Exception as e:
-                    logger.error(
-                        f"Error processing completed batch job {batch_job.id}: {str(e)}"
+                    logger.error(f"Unexpected error processing batch job {batch_job.id}: {str(e)}")
+                    return BatchJobResult(
+                        job_id=batch_job.id,
+                        success=False,
+                        error_type="unexpected_error",
+                        error_message=str(e),
+                        error_details={"suggestion": "Contact support if this error persists"}
                     )
             elif status in ["failed", "expired", "cancelled"]:
                 logger.error(f"Batch job {batch_job.id} {status}")
-                return BatchJobResult(job_id=batch_job.id, success=False)
+                error_messages = {
+                    "failed": "Batch job failed during processing",
+                    "expired": "Batch job expired before completion",
+                    "cancelled": "Batch job was cancelled"
+                }
+                error_suggestions = {
+                    "failed": "Check input file format and content for errors",
+                    "expired": "Resubmit the job or increase completion window",
+                    "cancelled": "Resubmit the job if cancellation was unintended"
+                }
+                return BatchJobResult(
+                    job_id=batch_job.id,
+                    success=False,
+                    error_type="job_" + status,
+                    error_message=error_messages.get(status, f"Job {status}"),
+                    error_details={"suggestion": error_suggestions.get(status, "Please retry")}
+                )
             elif status is None:
                 logger.error(f"Failed to retrieve status for batch job {batch_job.id}")
-                return BatchJobResult(job_id=batch_job.id, success=False)
+                return BatchJobResult(
+                    job_id=batch_job.id,
+                    success=False,
+                    error_type="status_check_failed",
+                    error_message="Failed to retrieve job status",
+                    error_details={"suggestion": "Check network connection and API key validity"}
+                )
 
             await asyncio.sleep(check_interval)
             check_interval = min(
@@ -237,6 +325,7 @@ class BatchProcessor:
 
     async def close(self):
         await self.client.close()
+
 
 
 
