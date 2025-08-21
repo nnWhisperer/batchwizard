@@ -16,3 +16,7 @@ class BatchJobResult(BaseModel):
     job_id: str
     success: bool
     output_file_path: Optional[Path] = None
+    error_type: Optional[str] = None
+    error_message: Optional[str] = None
+    error_details: Optional[dict] = None
+
