@@ -103,8 +103,26 @@ class BatchProcessor:
         try:
             batch_job = await self.client.batches.retrieve(batch_id)
             return self.normalize_status(batch_job.status)
+        except AuthenticationError as e:
+            logger.error(f"Authentication error checking batch status: Invalid or expired API key")
+            return None
+        except PermissionDeniedError as e:
+            logger.error(f"Permission denied checking batch status: Insufficient permissions")
+            return None
+        except RateLimitError as e:
+            logger.error(f"Rate limit exceeded checking batch status: Too many requests, please wait and retry")
+            return None
+        except NotFoundError as e:
+            logger.error(f"Batch job not found: Job ID {batch_id} does not exist")
+            return None
+        except InternalServerError as e:
+            logger.error(f"OpenAI server error checking batch status: Please retry later")
+            return None
+        except APIError as e:
+            logger.error(f"OpenAI API error checking batch status: {str(e)}")
+            return None
         except Exception as e:
-            logger.error(f"Error checking batch status: {str(e)}")
+            logger.error(f"Unexpected error checking batch status: {str(e)}")
             return None
 
     def normalize_status(self, status: str) -> str:
@@ -201,6 +219,7 @@ class BatchProcessor:
 
     async def close(self):
         await self.client.close()
+
 
 
 
