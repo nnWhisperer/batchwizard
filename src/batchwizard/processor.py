@@ -5,7 +5,18 @@ from typing import List, Optional
 
 import aiofiles
 from loguru import logger
-from openai import AsyncOpenAI
+from openai import (
+    APIError,
+    AsyncOpenAI,
+    AuthenticationError,
+    BadRequestError,
+    ConflictError,
+    InternalServerError,
+    NotFoundError,
+    PermissionDeniedError,
+    RateLimitError,
+    UnprocessableEntityError,
+)
 
 from .config import config
 from .models import BatchJob, BatchJobResult
@@ -151,3 +162,4 @@ class BatchProcessor:
 
     async def close(self):
         await self.client.close()
+
