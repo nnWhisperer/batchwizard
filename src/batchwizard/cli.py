@@ -199,9 +199,23 @@ def download(
         try:
             batch_job = await processor.client.batches.retrieve(job_id)
             if batch_job.status != "completed":
-                console.print(
-                    f"[yellow]Job {job_id} is not completed (status: {batch_job.status}). Cannot download results.[/yellow]"
-                )
+                status_messages = {
+                    "validating": "Job is still being validated",
+                    "failed": "Job failed during processing",
+                    "in_progress": "Job is currently in progress",
+                    "finalizing": "Job is being finalized",
+                    "cancelled": "Job was cancelled",
+                    "expired": "Job expired before completion"
+                }
+                status_msg = status_messages.get(batch_job.status, f"Job status: {batch_job.status}")
+                console.print(f"[yellow]Job {job_id} is not completed ({status_msg}). Cannot download results.[/yellow]")
+                
+                if batch_job.status == "failed":
+                    console.print("[yellow]Suggestion: Check the job details for failure reasons and resubmit with corrected input.[/yellow]")
+                elif batch_job.status in ["validating", "in_progress", "finalizing"]:
+                    console.print("[yellow]Suggestion: Wait for the job to complete before downloading results.[/yellow]")
+                elif batch_job.status == "expired":
+                    console.print("[yellow]Suggestion: Resubmit the job as expired jobs cannot be recovered.[/yellow]")
                 return
 
             success = await processor.download_batch_results(batch_job, output_file)
@@ -211,10 +225,32 @@ def download(
                 )
             else:
                 console.print(f"[red]Failed to download results for job {job_id}[/red]")
+                console.print("[yellow]Suggestion: Check if the output file location is writable and try again.[/yellow]")
+        except AuthenticationError as e:
+            console.print(f"[red]Authentication Error: Invalid or expired API key.[/red]")
+            console.print("[yellow]Suggestion: Please check and update your OpenAI API key using 'batchwizard configure --set-key YOUR_API_KEY'[/yellow]")
+        except PermissionDeniedError as e:
+            console.print(f"[red]Permission Denied: Insufficient permissions to access job {job_id}.[/red]")
+            console.print("[yellow]Suggestion: Check your account permissions and ensure you have access to this batch job.[/yellow]")
+        except RateLimitError as e:
+            console.print(f"[red]Rate Limit Exceeded: Too many requests to the OpenAI API.[/red]")
+            console.print("[yellow]Suggestion: Wait a moment before retrying or reduce request frequency.[/yellow]")
+        except NotFoundError as e:
+            console.print(f"[red]Job Not Found: Batch job {job_id} does not exist.[/red]")
+            console.print("[yellow]Suggestion: Verify the job ID is correct using 'batchwizard list-jobs'.[/yellow]")
+        except BadRequestError as e:
+            console.print(f"[red]Bad Request: Invalid request parameters for job {job_id}.[/red]")
+            console.print(f"[yellow]Details: {str(e)}[/yellow]")
+            console.print("[yellow]Suggestion: Check the job ID format and ensure it's valid.[/yellow]")
+        except InternalServerError as e:
+            console.print(f"[red]OpenAI Server Error: Internal server error occurred.[/red]")
+            console.print("[yellow]Suggestion: Please retry the operation later.[/yellow]")
+        except APIError as e:
+            console.print(f"[red]OpenAI API Error: {str(e)}[/red]")
+            console.print("[yellow]Suggestion: Check the error message for specific details.[/yellow]")
         except Exception as e:
-            console.print(
-                f"[red]Error downloading results for job {job_id}: {str(e)}[/red]"
-            )
+            console.print(f"[red]Unexpected Error downloading results for job {job_id}: {str(e)}[/red]")
+            console.print("[yellow]Suggestion: Check file permissions and disk space, or contact support if this error persists.[/yellow]")
         finally:
             await processor.close()
 
@@ -223,5 +259,6 @@ def download(
 
 if __name__ == "__main__":
     app()
+
 
 
