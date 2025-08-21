@@ -74,8 +74,29 @@ class BatchProcessor:
                 status=self.normalize_status(batch_job.status),
                 input_file_id=input_file_id,
             )
+        except AuthenticationError as e:
+            logger.error(f"Authentication error creating batch job: Invalid or expired API key")
+            return None
+        except PermissionDeniedError as e:
+            logger.error(f"Permission denied creating batch job: Insufficient permissions or credits")
+            return None
+        except RateLimitError as e:
+            logger.error(f"Rate limit exceeded creating batch job: Too many requests, please wait and retry")
+            return None
+        except BadRequestError as e:
+            logger.error(f"Bad request creating batch job: Invalid parameters or file format - {str(e)}")
+            return None
+        except NotFoundError as e:
+            logger.error(f"File not found creating batch job: Input file ID {input_file_id} not found")
+            return None
+        except InternalServerError as e:
+            logger.error(f"OpenAI server error creating batch job: Please retry later")
+            return None
+        except APIError as e:
+            logger.error(f"OpenAI API error creating batch job: {str(e)}")
+            return None
         except Exception as e:
-            logger.error(f"Error creating batch job: {str(e)}")
+            logger.error(f"Unexpected error creating batch job: {str(e)}")
             return None
 
     async def check_batch_status(self, batch_id: str) -> Optional[str]:
@@ -180,5 +201,6 @@ class BatchProcessor:
 
     async def close(self):
         await self.client.close()
+
 
 
