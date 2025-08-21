@@ -279,21 +279,36 @@ class BatchWizardUI:
 
         self.console.print(table)
 
-    def display_cancel_result(self, job_id: str, success: bool):
+    def display_cancel_result(self, job_id: str, success: bool, error_details: Optional[dict] = None):
         if success:
             self.console.print(f"[green]Job {job_id} cancelled successfully.[/green]")
         else:
-            self.console.print(f"[red]Failed to cancel job {job_id}.[/red]")
+            error_msg = f"[red]Failed to cancel job {job_id}.[/red]"
+            if error_details:
+                if error_details.get("error_type"):
+                    error_msg += f" [Error: {error_details['error_type']}]"
+                if error_details.get("error_message"):
+                    error_msg += f" - {error_details['error_message']}"
+                if error_details.get("suggestion"):
+                    error_msg += f" | Suggestion: {error_details['suggestion']}"
+            self.console.print(error_msg)
 
-    def display_download_result(self, job_id: str, output_file: Path, success: bool):
+    def display_download_result(self, job_id: str, output_file: Path, success: bool, error_details: Optional[dict] = None):
         if success:
             self.console.print(
                 f"[green]Results for job {job_id} downloaded successfully to {output_file}[/green]"
             )
         else:
-            self.console.print(
-                f"[red]Failed to download results for job {job_id}[/red]"
-            )
+            error_msg = f"[red]Failed to download results for job {job_id}[/red]"
+            if error_details:
+                if error_details.get("error_type"):
+                    error_msg += f" [Error: {error_details['error_type']}]"
+                if error_details.get("error_message"):
+                    error_msg += f" - {error_details['error_message']}"
+                if error_details.get("suggestion"):
+                    error_msg += f" | Suggestion: {error_details['suggestion']}"
+            self.console.print(error_msg)
+
 
 
 
