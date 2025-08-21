@@ -151,8 +151,30 @@ def cancel(
         try:
             await processor.client.batches.cancel(job_id)
             console.print(f"[green]Job {job_id} cancelled successfully.[/green]")
+        except AuthenticationError as e:
+            console.print(f"[red]Authentication Error: Invalid or expired API key.[/red]")
+            console.print("[yellow]Suggestion: Please check and update your OpenAI API key using 'batchwizard configure --set-key YOUR_API_KEY'[/yellow]")
+        except PermissionDeniedError as e:
+            console.print(f"[red]Permission Denied: Insufficient permissions to cancel job {job_id}.[/red]")
+            console.print("[yellow]Suggestion: Check your account permissions and ensure you have access to batch operations.[/yellow]")
+        except RateLimitError as e:
+            console.print(f"[red]Rate Limit Exceeded: Too many requests to the OpenAI API.[/red]")
+            console.print("[yellow]Suggestion: Wait a moment before retrying or reduce request frequency.[/yellow]")
+        except NotFoundError as e:
+            console.print(f"[red]Job Not Found: Batch job {job_id} does not exist.[/red]")
+            console.print("[yellow]Suggestion: Verify the job ID is correct using 'batchwizard list-jobs'.[/yellow]")
+        except ConflictError as e:
+            console.print(f"[red]Conflict Error: Job {job_id} cannot be cancelled in its current state.[/red]")
+            console.print("[yellow]Suggestion: Check the job status - only jobs that are 'validating', 'in_progress', or 'finalizing' can be cancelled.[/yellow]")
+        except InternalServerError as e:
+            console.print(f"[red]OpenAI Server Error: Internal server error occurred.[/red]")
+            console.print("[yellow]Suggestion: Please retry the operation later.[/yellow]")
+        except APIError as e:
+            console.print(f"[red]OpenAI API Error: {str(e)}[/red]")
+            console.print("[yellow]Suggestion: Check the error message for specific details.[/yellow]")
         except Exception as e:
-            console.print(f"[red]Error cancelling job {job_id}: {str(e)}[/red]")
+            console.print(f"[red]Unexpected Error cancelling job {job_id}: {str(e)}[/red]")
+            console.print("[yellow]Suggestion: Contact support if this error persists.[/yellow]")
         finally:
             await processor.close()
 
@@ -201,4 +223,5 @@ def download(
 
 if __name__ == "__main__":
     app()
+
 
