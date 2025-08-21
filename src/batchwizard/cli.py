@@ -5,6 +5,17 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+from openai import (
+    APIError,
+    AuthenticationError,
+    BadRequestError,
+    ConflictError,
+    InternalServerError,
+    NotFoundError,
+    PermissionDeniedError,
+    RateLimitError,
+    UnprocessableEntityError,
+)
 from rich.console import Console
 from rich.table import Table
 
@@ -190,3 +201,4 @@ def download(
 
 if __name__ == "__main__":
     app()
+
