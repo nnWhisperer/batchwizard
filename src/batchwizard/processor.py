@@ -142,8 +142,26 @@ class BatchProcessor:
                     f"Batch job not completed or missing output file. Status: {batch_job.status}"
                 )
                 return False
+        except AuthenticationError as e:
+            logger.error(f"Authentication error downloading batch results: Invalid or expired API key")
+            return False
+        except PermissionDeniedError as e:
+            logger.error(f"Permission denied downloading batch results: Insufficient permissions")
+            return False
+        except RateLimitError as e:
+            logger.error(f"Rate limit exceeded downloading batch results: Too many requests, please wait and retry")
+            return False
+        except NotFoundError as e:
+            logger.error(f"Output file not found: File ID {batch_job.output_file_id} does not exist")
+            return False
+        except InternalServerError as e:
+            logger.error(f"OpenAI server error downloading batch results: Please retry later")
+            return False
+        except APIError as e:
+            logger.error(f"OpenAI API error downloading batch results: {str(e)}")
+            return False
         except Exception as e:
-            logger.error(f"Error downloading batch results: {str(e)}")
+            logger.error(f"Unexpected error downloading batch results: {str(e)}")
             return False
 
     async def process_batch_job(
@@ -219,6 +237,7 @@ class BatchProcessor:
 
     async def close(self):
         await self.client.close()
+
 
 
 
