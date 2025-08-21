@@ -66,16 +66,24 @@ class BatchWizardUI:
         job_table.add_column("Error Details", style="red", no_wrap=False)
         return job_table
 
-    def update_job_status(self, job_id: str, status: str, progress: str):
+    def update_job_status(self, job_id: str, status: str, progress: str, error_result: Optional[BatchJobResult] = None):
         color = (
             "green"
             if status == "completed"
             else "red" if status in ["failed", "expired", "cancelled"] else "yellow"
         )
-        self.jobs[job_id] = (f"[{color}]{status}", progress)
+        
+        # Format error details for display
+        error_details = ""
+        if error_result and not error_result.success and error_result.error_type:
+            error_details = f"{error_result.error_type}"
+            if error_result.error_message:
+                error_details += f": {error_result.error_message[:50]}..."
+        
+        self.jobs[job_id] = (f"[{color}]{status}", progress, error_details)
         self.job_table = self.create_job_table()
-        for job_id, (status, progress) in self.jobs.items():
-            self.job_table.add_row(job_id, status, progress)
+        for job_id, (status, progress, error_info) in self.jobs.items():
+            self.job_table.add_row(job_id, status, progress, error_info)
 
     def create_stats_table(self):
         stats_table = Table(show_header=False, expand=True)
@@ -270,6 +278,7 @@ class BatchWizardUI:
             self.console.print(
                 f"[red]Failed to download results for job {job_id}[/red]"
             )
+
 
 
 
