@@ -82,7 +82,13 @@ class BatchWizardUI:
         
         self.jobs[job_id] = (f"[{color}]{status}", progress, error_details)
         self.job_table = self.create_job_table()
-        for job_id, (status, progress, error_info) in self.jobs.items():
+        for job_id, job_data in self.jobs.items():
+            # Handle backward compatibility for existing job entries
+            if len(job_data) == 2:
+                status, progress = job_data
+                error_info = ""
+            else:
+                status, progress, error_info = job_data
             self.job_table.add_row(job_id, status, progress, error_info)
 
     def create_stats_table(self):
@@ -308,6 +314,7 @@ class BatchWizardUI:
                 if error_details.get("suggestion"):
                     error_msg += f" | Suggestion: {error_details['suggestion']}"
             self.console.print(error_msg)
+
 
 
 
