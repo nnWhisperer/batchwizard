@@ -39,8 +39,26 @@ class BatchProcessor:
                 f"File uploaded successfully: {response.id}, Filename: {file_path.name}"
             )
             return response.id
+        except AuthenticationError as e:
+            logger.error(f"Authentication error uploading file {file_path.name}: Invalid or expired API key")
+            return None
+        except PermissionDeniedError as e:
+            logger.error(f"Permission denied uploading file {file_path.name}: Insufficient permissions or credits")
+            return None
+        except RateLimitError as e:
+            logger.error(f"Rate limit exceeded uploading file {file_path.name}: Too many requests, please wait and retry")
+            return None
+        except BadRequestError as e:
+            logger.error(f"Bad request uploading file {file_path.name}: Invalid file format or parameters - {str(e)}")
+            return None
+        except InternalServerError as e:
+            logger.error(f"OpenAI server error uploading file {file_path.name}: Please retry later")
+            return None
+        except APIError as e:
+            logger.error(f"OpenAI API error uploading file {file_path.name}: {str(e)}")
+            return None
         except Exception as e:
-            logger.error(f"Error uploading file {file_path.name}: {str(e)}")
+            logger.error(f"Unexpected error uploading file {file_path.name}: {str(e)}")
             return None
 
     async def create_batch_job(self, input_file_id: str) -> Optional[BatchJob]:
@@ -162,4 +180,5 @@ class BatchProcessor:
 
     async def close(self):
         await self.client.close()
+
 
