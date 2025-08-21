@@ -125,6 +125,22 @@ class BatchWizardUI:
 
     def get_log_panel(self):
         return Panel("\n".join(self.log_messages), title="Logs", border_style="green")
+    
+    def display_error_details(self, job_result: BatchJobResult):
+        """Display detailed error information for a failed job"""
+        if not job_result.success and job_result.error_type:
+            error_table = Table(title=f"Error Details for Job {job_result.job_id}", show_header=True)
+            error_table.add_column("Field", style="cyan", no_wrap=True)
+            error_table.add_column("Value", style="red")
+            
+            error_table.add_row("Error Type", job_result.error_type or "Unknown")
+            error_table.add_row("Error Message", job_result.error_message or "No message available")
+            
+            if job_result.error_details:
+                for key, value in job_result.error_details.items():
+                    error_table.add_row(key.title(), str(value))
+            
+            self.console.print(error_table)
 
     def update_layout(
         self,
@@ -278,6 +294,7 @@ class BatchWizardUI:
             self.console.print(
                 f"[red]Failed to download results for job {job_id}[/red]"
             )
+
 
 
 
