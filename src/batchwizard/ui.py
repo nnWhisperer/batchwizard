@@ -2,7 +2,7 @@
 import asyncio
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from loguru import logger
 from rich.console import Console
@@ -14,6 +14,7 @@ from rich.progress import (BarColumn, Progress, SpinnerColumn,
 from rich.table import Table
 from rich.text import Text
 
+from .models import BatchJobResult
 from .processor import BatchProcessor
 
 
@@ -62,18 +63,33 @@ class BatchWizardUI:
         job_table.add_column("Job ID", style="dim", no_wrap=True)
         job_table.add_column("Status", style="bold")
         job_table.add_column("Progress", justify="right")
+        job_table.add_column("Error Details", style="red", no_wrap=False)
         return job_table
 
-    def update_job_status(self, job_id: str, status: str, progress: str):
+    def update_job_status(self, job_id: str, status: str, progress: str, error_result: Optional[BatchJobResult] = None):
         color = (
             "green"
             if status == "completed"
             else "red" if status in ["failed", "expired", "cancelled"] else "yellow"
         )
-        self.jobs[job_id] = (f"[{color}]{status}", progress)
+        
+        # Format error details for display
+        error_details = ""
+        if error_result and not error_result.success and error_result.error_type:
+            error_details = f"{error_result.error_type}"
+            if error_result.error_message:
+                error_details += f": {error_result.error_message[:50]}..."
+        
+        self.jobs[job_id] = (f"[{color}]{status}", progress, error_details)
         self.job_table = self.create_job_table()
-        for job_id, (status, progress) in self.jobs.items():
-            self.job_table.add_row(job_id, status, progress)
+        for job_id, job_data in self.jobs.items():
+            # Handle backward compatibility for existing job entries
+            if len(job_data) == 2:
+                status, progress = job_data
+                error_info = ""
+            else:
+                status, progress, error_info = job_data
+            self.job_table.add_row(job_id, status, progress, error_info)
 
     def create_stats_table(self):
         stats_table = Table(show_header=False, expand=True)
@@ -95,14 +111,42 @@ class BatchWizardUI:
         )
         self.stats_table.add_row("Failed", f"[red]{self.failed_jobs}[/red]")
 
-    def add_log(self, message: str):
-        self.log_messages.append(message)
+    def add_log(self, message: str, error_result: Optional[BatchJobResult] = None):
+        if error_result and not error_result.success and error_result.error_type:
+            # Format detailed error message with error information
+            detailed_message = f"{message}"
+            if error_result.error_type:
+                detailed_message += f" [Error: {error_result.error_type}]"
+            if error_result.error_message:
+                detailed_message += f" - {error_result.error_message}"
+            if error_result.error_details and error_result.error_details.get("suggestion"):
+                detailed_message += f" | Suggestion: {error_result.error_details['suggestion']}"
+            self.log_messages.append(detailed_message)
+        else:
+            self.log_messages.append(message)
+        
         if len(self.log_messages) > 10:  # Keep only the last 10 log messages
             self.log_messages.pop(0)
         logger.info(message)
 
     def get_log_panel(self):
         return Panel("\n".join(self.log_messages), title="Logs", border_style="green")
+    
+    def display_error_details(self, job_result: BatchJobResult):
+        """Display detailed error information for a failed job"""
+        if not job_result.success and job_result.error_type:
+            error_table = Table(title=f"Error Details for Job {job_result.job_id}", show_header=True)
+            error_table.add_column("Field", style="cyan", no_wrap=True)
+            error_table.add_column("Value", style="red")
+            
+            error_table.add_row("Error Type", job_result.error_type or "Unknown")
+            error_table.add_row("Error Message", job_result.error_message or "No message available")
+            
+            if job_result.error_details:
+                for key, value in job_result.error_details.items():
+                    error_table.add_row(key.title(), str(value))
+            
+            self.console.print(error_table)
 
     def update_layout(
         self,
@@ -192,8 +236,8 @@ class BatchWizardUI:
                                 )
                         else:
                             self.failed_jobs += 1
-                            self.update_job_status(batch_job.id, "failed", "100%")
-                            self.add_log(f"Job failed: {batch_job.id}")
+                            self.update_job_status(batch_job.id, "failed", "100%", error_result=result)
+                            self.add_log(f"Job failed: {batch_job.id}", error_result=result)
 
                         overall_progress.update(process_task, advance=1)
                         self.update_stats()
@@ -241,18 +285,41 @@ class BatchWizardUI:
 
         self.console.print(table)
 
-    def display_cancel_result(self, job_id: str, success: bool):
+    def display_cancel_result(self, job_id: str, success: bool, error_details: Optional[dict] = None):
         if success:
             self.console.print(f"[green]Job {job_id} cancelled successfully.[/green]")
         else:
-            self.console.print(f"[red]Failed to cancel job {job_id}.[/red]")
+            error_msg = f"[red]Failed to cancel job {job_id}.[/red]"
+            if error_details:
+                if error_details.get("error_type"):
+                    error_msg += f" [Error: {error_details['error_type']}]"
+                if error_details.get("error_message"):
+                    error_msg += f" - {error_details['error_message']}"
+                if error_details.get("suggestion"):
+                    error_msg += f" | Suggestion: {error_details['suggestion']}"
+            self.console.print(error_msg)
 
-    def display_download_result(self, job_id: str, output_file: Path, success: bool):
+    def display_download_result(self, job_id: str, output_file: Path, success: bool, error_details: Optional[dict] = None):
         if success:
             self.console.print(
                 f"[green]Results for job {job_id} downloaded successfully to {output_file}[/green]"
             )
         else:
-            self.console.print(
-                f"[red]Failed to download results for job {job_id}[/red]"
-            )
+            error_msg = f"[red]Failed to download results for job {job_id}[/red]"
+            if error_details:
+                if error_details.get("error_type"):
+                    error_msg += f" [Error: {error_details['error_type']}]"
+                if error_details.get("error_message"):
+                    error_msg += f" - {error_details['error_message']}"
+                if error_details.get("suggestion"):
+                    error_msg += f" | Suggestion: {error_details['suggestion']}"
+            self.console.print(error_msg)
+
+
+
+
+
+
+
+
+
